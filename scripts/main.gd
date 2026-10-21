@@ -42,7 +42,7 @@ func _setup_input() -> void:
 	_bind("spell_1", [KEY_1])
 	_bind("cancel", [KEY_ESCAPE])
 	_bind("autorun", [KEY_NUMLOCK])
-	_bind("toggle_help", [KEY_F1])
+	_bind("toggle_help", [KEY_F1, KEY_H])
 
 
 func _bind(action: String, keys: Array) -> void:

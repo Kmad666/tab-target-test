@@ -25,7 +25,7 @@ A hooded caster with glowing red eyes and skeletal hands stands on a grass plane
 | 1 | Force Lightning (channeled until interrupted) |
 | Esc | Cancel cast / clear target |
 | Num Lock | Autorun |
-| F1 | Show / hide controls |
+| F1 or H | Show / hide controls |
 
 ## How it works
 
@@ -42,3 +42,10 @@ A hooded caster with glowing red eyes and skeletal hands stands on a grass plane
 | `scripts/training_dummy.gd` | The dummy |
 | `scripts/hud.gd` | Player/target frames, cast bar, action bar |
 | `scripts/lowpoly.gd` | Helpers for flat-shaded low poly shapes |
+
+## Play in the browser
+
+The web build lives on the `gh-pages` branch and is served by GitHub Pages:
+https://kmad666.github.io/tab-target-test/
+
+To rebuild it: in Godot, Project → Export → Web → Export Project into `build/web/`, then copy those files to the `gh-pages` branch. Thread support is off so it runs on GitHub Pages without special headers.

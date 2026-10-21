@@ -134,7 +134,7 @@ func _ready() -> void:
 
 	# Controls (F1 toggles)
 	_help = _label("", 13, Color(0.9, 0.88, 0.8))
-	_help.text = "W/S  forward / back\nA/D  turn (strafe with right mouse)\nQ/E  strafe\nLeft drag  look around\nRight drag  steer\nBoth mouse buttons  run\nWheel  zoom\nTab or click  target\n1  Force Lightning (moving cancels)\nEsc  cancel cast / clear target\nNum Lock  autorun\nF1  hide this help"
+	_help.text = "W/S  forward / back\nA/D  turn (strafe with right mouse)\nQ/E  strafe\nLeft drag  look around\nRight drag  steer\nBoth mouse buttons  run\nWheel  zoom\nTab or click  target\n1  Force Lightning (moving cancels)\nEsc  cancel cast / clear target\nNum Lock  autorun\nF1 or H  hide this help"
 	_help.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_root.add_child(_help)
 
