@@ -41,8 +41,7 @@ var _torso: Node3D
 var _hood: Node3D
 var _arms := {}
 var _cloud_root: Node3D
-var _puffs: Array = []
-var _cloud: CPUParticles3D
+var _trail: CloudTrail
 var _eye_mat: StandardMaterial3D
 
 
@@ -244,6 +243,7 @@ func _update_channel(delta: float) -> void:
 const ROBE_COLOR := Color(0.36, 0.14, 0.55)
 const LINING_COLOR := Color(0.06, 0.42, 0.5)
 const EYE_COLOR := Color(1.0, 0.1, 0.05)
+const SHOULDER_X := 0.46
 
 
 func _process(delta: float) -> void:
@@ -254,15 +254,15 @@ func _process(delta: float) -> void:
 	var cb := smoothstep(0.0, 1.0, _cast_blend)
 	var hv := smoothstep(0.0, 1.0, _hover)
 
-	# Slightly stooped, scheming posture; leans in while casting.
+	# Slightly stooped; leans in while casting.
 	var breath := sin(_t * 1.6)
-	var lean := lerpf(0.14, 0.3, cb)
+	var lean := lerpf(0.12, 0.28, cb)
 	_torso.rotation.x = -(lean + breath * 0.02)
 	_hood.rotation.x = lean * 0.55 + breath * 0.015
-	_hood.rotation.z = sin(_t * 0.7) * 0.07 * (1.0 - cb)
+	_hood.rotation.z = sin(_t * 0.7) * 0.05 * (1.0 - cb)
 
-	# Hover on the dark cloud while moving.
-	_body.position.y = hv * 0.5 + sin(_t * 2.4) * 0.05 * hv
+	# Ride the cloud while moving. The cloud itself is one static mesh that just grows in.
+	_body.position.y = hv * 0.5
 	var k := 1.0 - exp(-6.0 * delta)
 	_lean_fwd = lerpf(_lean_fwd, -_move_local.z, k)
 	_lean_side = lerpf(_lean_side, _move_local.x, k)
@@ -270,17 +270,13 @@ func _process(delta: float) -> void:
 	_model.rotation.z = -0.12 * _lean_side * hv
 	_cloud_root.visible = _hover > 0.01
 	_cloud_root.scale = Vector3.ONE * maxf(hv, 0.001)
-	_cloud_root.rotation.y += delta * 1.2
-	for i in _puffs.size():
-		var puff: MeshInstance3D = _puffs[i]
-		puff.scale = puff.get_meta("base") * (1.0 + 0.13 * sin(_t * 3.2 + i * 1.7))
-	_cloud.emitting = _hover > 0.05
+	_trail.emitting = _hover > 0.5
 
 	# Eyes burn brighter while casting.
 	var eye_energy := lerpf(2.5, 5.0, cb) + sin(_t * 30.0) * 0.5 * cb
 	_eye_mat.albedo_color = EYE_COLOR * eye_energy
 
-	# Arms: "behold" pose with wiggling fingers; right hand points at the target when casting.
+	# Arms: relaxed at his sides; right hand points at the target when casting.
 	var aim_pitch := 0.0
 	var right: Dictionary = _arms["right"]
 	if is_instance_valid(target) and target.has_method("get_hit_point"):
@@ -294,28 +290,29 @@ func _process(delta: float) -> void:
 		var cast: Dictionary
 		if side_name == "right":
 			var tremble := sin(_t * 41.0) * 0.02
-			cast = {"sh": Vector3(PI / 2.0 + lean + aim_pitch + tremble, 0.0, -0.1),
-					"el": Vector3(0.04, 0.0, 0.0), "wr": Vector3(0.05, 0.0, 0.0),
+			cast = {"sh": Vector3(PI / 2.0 + lean + aim_pitch + tremble, 0.0, 0.14),
+					"el": Vector3(0.04, 0.0, -0.14), "wr": Vector3(0.05, 0.0, 0.0),
 					"idx": 0.0, "fing": 1.5, "th": 0.9}
 		else:
+			# Off hand curls into a fist, slightly raised.
 			cast = idle.duplicate()
-			cast["sh"] += Vector3(0.1, 0.0, 0.12)
-			cast["el"] += Vector3(0.0, 0.0, 0.2)
-			cast["idx"] = 1.0
-			cast["fing"] = 1.2
+			cast["sh"] += Vector3(0.2, 0.0, 0.05)
+			cast["el"] += Vector3(0.55, 0.0, 0.0)
+			cast["idx"] = 1.3
+			cast["fing"] = 1.4
+			cast["th"] = 0.9
 		_apply_arm(arm, _blend_pose(idle, cast, cb))
 
 
 func _idle_pose(phase: float) -> Dictionary:
 	var sway := sin(_t * 1.6 + phase)
-	var wiggle := _t * 3.0 + phase
 	return {
-		"sh": Vector3(0.3 + sway * 0.03, 0.0, 1.0 + sway * 0.04),
-		"el": Vector3(0.3, 0.0, 0.95),
-		"wr": Vector3(-0.15, -1.35, 0.25 + sway * 0.05),
-		"idx": 0.25 + 0.2 * sin(wiggle),
-		"fing": 0.45 + 0.2 * sin(wiggle + 0.9),
-		"th": 0.25,
+		"sh": Vector3(0.1 + sway * 0.02, 0.0, 0.2),
+		"el": Vector3(0.35 + sway * 0.02, 0.0, -0.04),
+		"wr": Vector3(0.12, -1.2, 0.0),
+		"idx": 0.4,
+		"fing": 0.55,
+		"th": 0.3,
 	}
 
 
@@ -359,35 +356,30 @@ func _build_model() -> void:
 	Toon.add(_body, Toon.lathe([Vector2(0.68, 0.0), Vector2(0.65, 0.07), Vector2(0.55, 0.26),
 			Vector2(0.44, 0.5), Vector2(0.35, 0.7), Vector2(0.3, 0.88)], 32, 7, 0.09), robe)
 
-	# Upper body pivots at the waist.
+	# Upper body pivots at the waist. Wide x scale gives broad, rounded shoulders.
 	_torso = Toon.pivot(_body, Vector3(0, 0.82, 0))
-	Toon.add(_torso, Toon.lathe([Vector2(0.3, -0.04), Vector2(0.31, 0.2), Vector2(0.3, 0.36),
-			Vector2(0.22, 0.46), Vector2(0.12, 0.5)], 24), robe, Vector3.ZERO, Vector3.ZERO, Vector3(1.22, 1, 1))
-	# Shoulder mantle that drapes down from the hood.
-	Toon.add(_torso, Toon.lathe([Vector2(0.5, 0.25), Vector2(0.45, 0.35), Vector2(0.32, 0.45),
-			Vector2(0.18, 0.5)], 32, 8, 0.06), robe, Vector3.ZERO, Vector3.ZERO, Vector3(1.15, 1, 1.05))
-	# Gold clasp with a red gem.
-	Toon.add(_torso, Toon.torus(0.035, 0.062, 18, 8), gold, Vector3(0, 0.43, -0.4), Vector3(PI / 2.0 - 0.5, 0, 0))
-	Toon.add(_torso, Toon.ball(0.036, 12, 8), gem, Vector3(0, 0.43, -0.41))
+	Toon.add(_torso, Toon.lathe([Vector2(0.3, -0.04), Vector2(0.31, 0.2), Vector2(0.31, 0.36),
+			Vector2(0.25, 0.46), Vector2(0.13, 0.52)], 24), robe, Vector3.ZERO, Vector3.ZERO, Vector3(1.38, 1, 1))
+	# Gold clasp with a red gem at the collar.
+	Toon.add(_torso, Toon.torus(0.03, 0.055, 18, 8), gold, Vector3(0, 0.42, -0.285), Vector3(PI / 2.0 - 0.35, 0, 0))
+	Toon.add(_torso, Toon.ball(0.032, 12, 8), gem, Vector3(0, 0.42, -0.295))
 
-	# Deep hood, opening forward. The inside is pure black, so the face is a void.
+	# Deep hood, opening forward, with a ragged, tattered edge.
 	_hood = Toon.pivot(_torso, Vector3(0, 0.74, -0.02))
 	var hood_mat := Toon.outlined(Toon.mat(ROBE_COLOR, {"use_inner": true, "inner_color": Color(0, 0, 0)}))
-	var peak := func(v: Vector3) -> Vector3:
-		var w := Vector3(v.x, v.z, -v.y)          # turn the cup to open toward -Z (forward)
-		var t := clampf(w.y / 0.29, 0.0, 1.0) * clampf(w.z / 0.29, 0.0, 1.0)
-		t *= t
-		w.y += t * 0.24
-		w.z += t * 0.2
-		if w.y < 0.0:
-			w.x *= 1.0 + 0.4 * clampf(-w.y / 0.29, 0.0, 1.0)
-		return w
+	var shell := func(v: Vector3) -> Vector3: return _hood_shape(v, 0.0, 1.0)
 	Toon.add(_hood, Toon.lathe([Vector2(0.0, -0.3), Vector2(0.15, -0.27), Vector2(0.25, -0.17),
-			Vector2(0.29, -0.04), Vector2(0.29, 0.09), Vector2(0.25, 0.21), Vector2(0.21, 0.3)], 26, 0, 0.0, peak),
-			hood_mat, Vector3.ZERO, Vector3.ZERO, Vector3(1.0, 1.08, 1.0))
-	# Thick rolled rim around the opening.
-	Toon.add(_hood, Toon.torus(0.19, 0.25, 26, 8), robe, Vector3(0, 0, -0.3), Vector3(PI / 2.0, 0, 0), Vector3(1.0, 1.0, 1.1))
-	# Angry red eyes deep inside.
+			Vector2(0.29, -0.04), Vector2(0.29, 0.09), Vector2(0.25, 0.21), Vector2(0.23, 0.26),
+			Vector2(0.21, 0.3)], 26, 0, 0.0, shell), hood_mat, Vector3.ZERO, Vector3.ZERO, Vector3(1.0, 1.08, 1.0))
+	# Tattered teal lining just inside the edge; its rags poke out between the outer ones.
+	var lining_mat := Toon.outlined(Toon.mat(LINING_COLOR, {"shade": Color(0.45, 0.5, 0.7)}))
+	var rag := func(v: Vector3) -> Vector3: return _hood_shape(v, 0.5, 1.25)
+	Toon.add(_hood, Toon.lathe([Vector2(0.235, 0.19), Vector2(0.215, 0.25), Vector2(0.195, 0.29)],
+			26, 0, 0.0, rag), lining_mat, Vector3.ZERO, Vector3.ZERO, Vector3(1.0, 1.08, 1.0))
+	# Solid black "head" so the whole face area reads as a void.
+	Toon.add(_hood, Toon.ball(0.22, 16, 10), Toon.unshaded(Color.BLACK), Vector3(0, -0.06, 0.06),
+			Vector3.ZERO, Vector3(1.05, 1.3, 1.0))
+	# Angry red eyes.
 	for side in [1.0, -1.0]:
 		Toon.add(_hood, Toon.ball(0.035, 12, 8), _eye_mat, Vector3(0.075 * side, 0.0, -0.17),
 				Vector3(0, 0, 0.4 * side), Vector3(1.7, 0.75, 0.5))
@@ -397,17 +389,36 @@ func _build_model() -> void:
 	_build_cloud()
 
 
-## One arm: puffy upper sleeve, wide bell sleeve with lining, big white cartoon glove.
+## Shapes a hood vertex: turns the cup to face forward, pulls up a pointed tip at the back,
+## and cuts jagged rag teeth into the front edge. phase/scale vary the teeth per layer.
+func _hood_shape(v: Vector3, phase: float, jag_scale: float) -> Vector3:
+	var edge := clampf((v.y - 0.19) / 0.11, 0.0, 1.0)
+	if edge > 0.0:
+		var u := atan2(v.x, v.z) / TAU * 13.0 + phase
+		var tri := absf(fposmod(u, 1.0) * 2.0 - 1.0)
+		var rnd := fposmod(sin(floorf(u) * 12.9898 + phase * 7.0) * 43758.5453, 1.0)
+		v.y += tri * (0.03 + 0.06 * rnd) * edge * jag_scale
+	var w := Vector3(v.x, v.z, -v.y)          # opening now faces -Z (forward)
+	var t := clampf(w.y / 0.29, 0.0, 1.0) * clampf(w.z / 0.29, 0.0, 1.0)
+	t *= t
+	w.y += t * 0.24
+	w.z += t * 0.2
+	if w.y < 0.0:
+		w.x *= 1.0 + 0.4 * clampf(-w.y / 0.29, 0.0, 1.0)
+	return w
+
+
+## One arm: puffy upper sleeve, bell sleeve with lining, big white cartoon glove.
 ## side = 1 for right, -1 for left.
 func _build_arm(side: float, robe: Material, glove: Material) -> Dictionary:
-	var shoulder := Toon.pivot(_torso, Vector3(0.34 * side, 0.5, 0.02))
-	Toon.add(shoulder, Toon.ball(0.15, 16, 10), robe, Vector3.ZERO, Vector3.ZERO, Vector3(1, 0.9, 1))
+	var shoulder := Toon.pivot(_torso, Vector3(SHOULDER_X * side, 0.44, 0.02))
+	Toon.add(shoulder, Toon.ball(0.14, 16, 10), robe, Vector3(-0.02 * side, 0, 0), Vector3.ZERO, Vector3(1, 0.85, 1))
 	Toon.add(shoulder, Toon.cyl(0.12, 0.13, 0.3, 16), robe, Vector3(0, -0.15, 0))
 	var elbow := Toon.pivot(shoulder, Vector3(0, -0.31, 0))
 	Toon.add(elbow, Toon.ball(0.13, 16, 10), robe)
-	Toon.add(elbow, Toon.lathe([Vector2(0.23, -0.34), Vector2(0.18, -0.24), Vector2(0.145, -0.12),
+	Toon.add(elbow, Toon.lathe([Vector2(0.2, -0.32), Vector2(0.165, -0.22), Vector2(0.14, -0.11),
 			Vector2(0.125, 0.0)], 24, 5, 0.08), robe)
-	var wrist := Toon.pivot(elbow, Vector3(0, -0.33, 0))
+	var wrist := Toon.pivot(elbow, Vector3(0, -0.31, 0))
 	var hand := Toon.pivot(wrist)
 	hand.scale = Vector3.ONE * 1.3
 
@@ -432,40 +443,25 @@ func _build_arm(side: float, robe: Material, glove: Material) -> Dictionary:
 			"thumb": thumb, "side": side}
 
 
-## A cartoon storm cloud he rides on while moving.
+## The storm cloud he rides: all puffs merged into one still mesh (one draw, no animation),
+## plus a thin trail that streams out behind while moving.
 func _build_cloud() -> void:
 	var cloud_mat := Toon.outlined(Toon.mat(Color(0.24, 0.2, 0.32), {"shade": Color(0.5, 0.45, 0.7), "rim_strength": 0.5}))
 	_cloud_root = Toon.pivot(_model, Vector3(0, 0.12, 0))
 	_cloud_root.visible = false
-	var puff_mesh := Toon.ball(0.3, 14, 8)
+	var puff := Toon.ball(0.3, 14, 8)
 	var spots := [Vector3(0, 0.02, 0), Vector3(0.45, 0, 0.1), Vector3(-0.42, 0, 0.18), Vector3(0.15, 0, 0.48),
 			Vector3(-0.2, 0, -0.45), Vector3(0.38, 0.02, -0.32), Vector3(-0.5, 0.02, -0.15), Vector3(0.0, -0.08, 0.0)]
 	var sizes := [1.4, 1.0, 0.95, 0.85, 0.9, 0.8, 0.75, 1.2]
+	var st := SurfaceTool.new()
 	for i in spots.size():
-		var base: Vector3 = Vector3(1.0, 0.75, 1.0) * sizes[i]
-		var puff := Toon.add(_cloud_root, puff_mesh, cloud_mat, spots[i], Vector3.ZERO, base)
-		puff.set_meta("base", base)
-		_puffs.append(puff)
+		var b := Basis.from_scale(Vector3(1.0, 0.75, 1.0) * sizes[i])
+		st.append_from(puff, 0, Transform3D(b, spots[i]))
+	Toon.add(_cloud_root, st.commit(), cloud_mat)
 
-	# Small puffs that trail behind.
-	_cloud = CPUParticles3D.new()
-	_cloud.amount = 24
-	_cloud.lifetime = 0.9
-	_cloud.local_coords = false
-	_cloud.mesh = Toon.ball(0.13, 10, 6)
-	_cloud.material_override = Toon.mat(Color(0.24, 0.2, 0.32), {"shade": Color(0.5, 0.45, 0.7)})
-	_cloud.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
-	_cloud.emission_sphere_radius = 0.45
-	_cloud.direction = Vector3(0, 1, 0)
-	_cloud.spread = 60.0
-	_cloud.initial_velocity_min = 0.2
-	_cloud.initial_velocity_max = 0.6
-	_cloud.gravity = Vector3.ZERO
-	_cloud.scale_amount_min = 0.8
-	_cloud.scale_amount_max = 1.6
-	var curve := Curve.new()
-	curve.add_point(Vector2(0.0, 1.0))
-	curve.add_point(Vector2(1.0, 0.0))
-	_cloud.scale_amount_curve = curve
-	_cloud.emitting = false
-	_cloud_root.add_child(_cloud)
+	var trail_point := Marker3D.new()
+	trail_point.position = Vector3(0, 0.05, 0.35)
+	_cloud_root.add_child(trail_point)
+	_trail = CloudTrail.new()
+	_trail.source = trail_point
+	add_child(_trail)

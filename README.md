@@ -39,6 +39,7 @@ A hooded sorcerer in a purple robe, with a black void for a face, glowing red ey
 | `scripts/player.gd` | Movement, targeting, casting, the sorcerer model, poses and hover cloud |
 | `scripts/camera_rig.gd` | WoW-style mouse camera and click targeting |
 | `scripts/force_lightning.gd` | The lightning effect |
+| `scripts/cloud_trail.gd` | Thin wispy trail behind the hover cloud |
 | `scripts/training_dummy.gd` | The dummy |
 | `scripts/hud.gd` | Player/target frames, cast bar, action bar |
 | `scripts/toon.gd` | Toon materials, outlines and smooth shape helpers |
