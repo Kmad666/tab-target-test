@@ -67,8 +67,8 @@ func _build_environment() -> void:
 	env.background_mode = Environment.BG_SKY
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	env.ambient_light_energy = 0.45
-	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	env.ambient_light_energy = 0.3
+	env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
 	env.fog_enabled = true
 	env.fog_light_color = Color(0.72, 0.78, 0.86)
 	env.fog_density = 0.0035
@@ -85,7 +85,7 @@ func _build_environment() -> void:
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-50, -35, 0)
 	sun.light_color = Color(1.0, 0.96, 0.88)
-	sun.light_energy = 1.0
+	sun.light_energy = 0.85
 	sun.shadow_enabled = true
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	sun.directional_shadow_max_distance = 60.0
@@ -93,40 +93,13 @@ func _build_environment() -> void:
 
 
 func _build_ground() -> void:
-	# Flat plane made of big triangles in slightly different greens for a low poly look.
-	var size := 300.0
-	var cell := 5.0
-	var n := int(size / cell)
-	var half := size / 2.0
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 7
-	var greens := [Color(0.26, 0.43, 0.16), Color(0.22, 0.38, 0.13), Color(0.3, 0.47, 0.19)]
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	st.set_normal(Vector3.UP)
-	for ix in n:
-		for iz in n:
-			var x0 := -half + ix * cell
-			var z0 := -half + iz * cell
-			var p00 := Vector3(x0, 0, z0)
-			var p10 := Vector3(x0 + cell, 0, z0)
-			var p01 := Vector3(x0, 0, z0 + cell)
-			var p11 := Vector3(x0 + cell, 0, z0 + cell)
-			for tri in [[p00, p10, p01], [p10, p11, p01]]:
-				var c: Color = greens[rng.randi() % greens.size()]
-				c = c.lerp(Color(0.25, 0.42, 0.15), rng.randf() * 0.5)
-				for p in tri:
-					st.set_color(c)
-					st.set_normal(Vector3.UP)
-					st.add_vertex(p)
-	var ground_mat := StandardMaterial3D.new()
-	ground_mat.vertex_color_use_as_albedo = true
-	ground_mat.roughness = 1.0
-	var ground := MeshInstance3D.new()
-	ground.mesh = st.commit()
-	ground.material_override = ground_mat
+	# Soft rolling-meadow colors come from noise in the toon shader, so the plane is one cheap quad.
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(400, 400)
+	var ground := Toon.add(self, plane, Toon.mat(Color(0.3, 0.5, 0.2), {
+			"ground_noise": true, "ground_alt": Color(0.23, 0.42, 0.16),
+			"shade": Color(0.55, 0.6, 0.75), "rim_strength": 0.0}))
 	ground.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(ground)
 
 	var floor_body := StaticBody3D.new()
 	floor_body.collision_layer = 1
@@ -135,29 +108,40 @@ func _build_ground() -> void:
 	floor_body.add_child(floor_shape)
 	add_child(floor_body)
 
-	# A few grass tufts and rocks so you can feel yourself moving.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+
+	# Grass clumps: three blades each, drawn in one batch.
+	var blade := Toon.cyl(0.0, 0.05, 0.42, 4, false)
 	var tuft := MultiMesh.new()
 	tuft.transform_format = MultiMesh.TRANSFORM_3D
-	tuft.mesh = LowPoly.flat(LowPoly.cyl(0.0, 0.08, 0.4, 3))
-	tuft.instance_count = 1500
-	for i in tuft.instance_count:
-		var pos := Vector3(rng.randf_range(-90, 90), 0.18, rng.randf_range(-90, 90))
-		if pos.distance_to(DUMMY_POSITION) < 1.5:
-			pos.x += 3.0
-		var b := Basis(Vector3.UP, rng.randf() * TAU) * Basis(Vector3.RIGHT, rng.randf_range(-0.3, 0.3))
-		b = b.scaled(Vector3.ONE * rng.randf_range(0.6, 1.4))
-		tuft.set_instance_transform(i, Transform3D(b, pos))
+	tuft.mesh = blade
+	tuft.instance_count = 2400
+	var i := 0
+	while i < tuft.instance_count:
+		var center := Vector3(rng.randf_range(-90, 90), 0.0, rng.randf_range(-90, 90))
+		if center.distance_to(DUMMY_POSITION) < 1.6 or center.length() < 1.5:
+			continue
+		for b in 3:
+			if i >= tuft.instance_count:
+				break
+			var lean := Basis(Vector3.UP, rng.randf() * TAU) * Basis(Vector3.RIGHT, rng.randf_range(0.15, 0.45))
+			lean = lean.scaled(Vector3.ONE * rng.randf_range(0.6, 1.2))
+			var pos := center + Vector3(rng.randf_range(-0.12, 0.12), 0.18, rng.randf_range(-0.12, 0.12))
+			tuft.set_instance_transform(i, Transform3D(lean, pos))
+			i += 1
 	var tuft_mi := MultiMeshInstance3D.new()
 	tuft_mi.multimesh = tuft
-	tuft_mi.material_override = LowPoly.mat(Color(0.18, 0.34, 0.1))
+	tuft_mi.material_override = Toon.mat(Color(0.2, 0.4, 0.14), {"shade": Color(0.6, 0.65, 0.8), "rim_strength": 0.0})
 	tuft_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(tuft_mi)
 
-	var rock_mat := LowPoly.mat(Color(0.48, 0.48, 0.5))
-	for i in 30:
+	# Rounded boulders.
+	var rock_mat := Toon.outlined(Toon.mat(Color(0.62, 0.62, 0.68), {"shade": Color(0.5, 0.5, 0.72)}))
+	var rock_mesh := Toon.ball(0.5, 12, 7)
+	for r in 30:
 		var ang := rng.randf() * TAU
 		var dist := rng.randf_range(12.0, 90.0)
-		var pos := Vector3(cos(ang) * dist, 0.1, sin(ang) * dist)
 		var s := rng.randf_range(0.4, 1.3)
-		LowPoly.add(self, LowPoly.sphere(0.5, 6, 4), rock_mat, pos,
-				Vector3(0, rng.randf() * TAU, 0), Vector3(s * rng.randf_range(0.9, 1.5), s * 0.6, s))
+		Toon.add(self, rock_mesh, rock_mat, Vector3(cos(ang) * dist, 0.05, sin(ang) * dist),
+				Vector3(0, rng.randf() * TAU, 0), Vector3(s * rng.randf_range(0.9, 1.5), s * 0.55, s))

@@ -10,9 +10,8 @@ signal health_changed(hp: float, max_hp: float)
 var hp := 0.0
 
 var _ring: MeshInstance3D
-var _ring_mat: StandardMaterial3D
 var _sway: Node3D
-var _burlap: StandardMaterial3D
+var _burlap: ShaderMaterial
 var _flash := 0.0
 var _wobble := 0.0
 var _wobble_vel := 0.0
@@ -59,45 +58,41 @@ func _process(delta: float) -> void:
 	_sway.rotation.x = -_wobble * 0.12
 	# Blue-white flash from the lightning.
 	_flash = maxf(0.0, _flash - delta)
-	_burlap.emission = Color(0.45, 0.55, 1.0) * (_flash / 0.15)
+	_burlap.set_shader_parameter("emission_energy", 1.5 * _flash / 0.15)
 	# Pulsing red target circle.
 	if _ring.visible:
 		var s := 1.0 + sin(_t * 4.0) * 0.04
-		_ring.scale = Vector3(s, 1.0, s)
+		_ring.scale = Vector3(s, 0.3, s)
 
 
 func _build_model() -> void:
-	var wood := LowPoly.mat(Color(0.36, 0.22, 0.12))
-	var rope := LowPoly.mat(Color(0.25, 0.17, 0.1))
-	var stitch := LowPoly.mat(Color(0.12, 0.08, 0.05))
-	_burlap = LowPoly.mat(Color(0.78, 0.64, 0.42))
-	_burlap.emission_enabled = true
-	_burlap.emission = Color.BLACK
-	_burlap.emission_energy_multiplier = 2.0
+	var wood := Toon.outlined(Toon.mat(Color(0.55, 0.34, 0.18), {"shade": Color(0.5, 0.42, 0.6)}))
+	var rope := Toon.outlined(Toon.mat(Color(0.4, 0.27, 0.15), {"shade": Color(0.5, 0.42, 0.6)}))
+	var stitch := Toon.unshaded(Color(0.16, 0.09, 0.05))
+	_burlap = Toon.outlined(Toon.mat(Color(0.9, 0.76, 0.5), {"shade": Color(0.55, 0.48, 0.65),
+			"emission_color": Color(0.5, 0.6, 1.0)}))
 
-	LowPoly.add(self, LowPoly.cyl(0.45, 0.52, 0.16, 8), wood, Vector3(0, 0.08, 0))
+	Toon.add(self, Toon.cyl(0.45, 0.55, 0.18, 20), wood, Vector3(0, 0.09, 0))
 
-	_sway = LowPoly.pivot(self, Vector3(0, 0.16, 0))
-	LowPoly.add(_sway, LowPoly.cyl(0.07, 0.08, 1.0, 6), wood, Vector3(0, 0.45, 0))
-	LowPoly.add(_sway, LowPoly.cyl(0.28, 0.33, 0.8, 8), _burlap, Vector3(0, 1.1, 0))
-	for y in [0.82, 1.38]:
-		LowPoly.add(_sway, LowPoly.torus(0.27, 0.34, 10, 4), rope, Vector3(0, y, 0))
-	LowPoly.add(_sway, LowPoly.cyl(0.06, 0.06, 1.3, 6), wood, Vector3(0, 1.3, 0), Vector3(0, 0, PI / 2.0))
+	_sway = Toon.pivot(self, Vector3(0, 0.18, 0))
+	Toon.add(_sway, Toon.cyl(0.07, 0.085, 1.0, 12), wood, Vector3(0, 0.45, 0))
+	Toon.add(_sway, Toon.lathe([Vector2(0.24, 0.0), Vector2(0.33, 0.12), Vector2(0.35, 0.4),
+			Vector2(0.32, 0.68), Vector2(0.2, 0.8)], 20), _burlap, Vector3(0, 0.72, 0))
+	for y in [0.86, 1.36]:
+		Toon.add(_sway, Toon.torus(0.31, 0.37, 24, 8), rope, Vector3(0, y, 0))
+	Toon.add(_sway, Toon.cyl(0.06, 0.06, 1.3, 12), wood, Vector3(0, 1.3, 0), Vector3(0, 0, PI / 2.0))
 	for side in [1.0, -1.0]:
-		LowPoly.add(_sway, LowPoly.sphere(0.09, 6, 4), _burlap, Vector3(0.66 * side, 1.3, 0))
-	LowPoly.add(_sway, LowPoly.sphere(0.23, 8, 5), _burlap, Vector3(0, 1.72, 0))
+		Toon.add(_sway, Toon.ball(0.1, 14, 8), _burlap, Vector3(0.66 * side, 1.3, 0))
+	Toon.add(_sway, Toon.ball(0.24, 18, 12), _burlap, Vector3(0, 1.74, 0))
 	# Stitched X eyes and a mouth, facing +Z (toward the player's start).
 	for side in [1.0, -1.0]:
 		for r in [0.8, -0.8]:
-			LowPoly.add(_sway, LowPoly.box(Vector3(0.09, 0.018, 0.02)), stitch,
-					Vector3(0.08 * side, 1.77, 0.21), Vector3(0, 0, r))
-	LowPoly.add(_sway, LowPoly.box(Vector3(0.14, 0.018, 0.02)), stitch, Vector3(0, 1.63, 0.215))
+			Toon.add(_sway, Toon.box(Vector3(0.1, 0.02, 0.02)), stitch,
+					Vector3(0.08 * side, 1.79, 0.225), Vector3(0, 0, r))
+	Toon.add(_sway, Toon.box(Vector3(0.15, 0.02, 0.02)), stitch, Vector3(0, 1.65, 0.23))
 
 	# Red target circle on the ground, hidden until targeted.
-	_ring_mat = StandardMaterial3D.new()
-	_ring_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_ring_mat.albedo_color = Color(1.0, 0.12, 0.08)
-	_ring = LowPoly.add(self, LowPoly.torus(0.85, 0.95, 24, 3), _ring_mat, Vector3(0, 0.03, 0),
-			Vector3.ZERO, Vector3.ONE, false)
+	_ring = Toon.add(self, Toon.torus(0.85, 0.95, 40, 4), Toon.unshaded(Color(1.0, 0.12, 0.08)),
+			Vector3(0, 0.03, 0), Vector3.ZERO, Vector3(1, 0.3, 1))
 	_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_ring.visible = false

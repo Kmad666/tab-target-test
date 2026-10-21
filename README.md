@@ -1,8 +1,8 @@
 # Tab Target Test
 
-A tiny low poly, classic-WoW-style tab target prototype made in **Godot 4.6** (Compatibility renderer, so it runs on integrated graphics).
+A tiny cartoon-style, classic-WoW-style tab target prototype made in **Godot 4.6** (Compatibility renderer, so it runs on integrated graphics).
 
-A hooded caster with glowing red eyes and skeletal hands stands on a grass plane with a training dummy. Target it and channel Force Lightning.
+A hooded sorcerer in a purple robe, with a black void for a face, glowing red eyes and big white gloves, stands on a meadow with a training dummy. Target it and channel Force Lightning.
 
 ## Run it
 
@@ -31,17 +31,19 @@ A hooded caster with glowing red eyes and skeletal hands stands on a grass plane
 
 - **Force Lightning**: channeled, 30 yard range, ticks every 0.5s. Moving, Esc, changing target or leaving range interrupts it. The caster turns to face the target automatically.
 - **Training Dummy**: 2000 health, refills when it hits zero.
-- Everything is built from simple shapes in code, so there are no model files to import.
+- Everything is built from smooth shapes in code and drawn with a cel-shading shader plus ink outlines (`shaders/`), so there are no model or texture files and it stays light on integrated graphics.
 
 | File | What it does |
 |---|---|
 | `scripts/main.gd` | Builds the level, lighting and input keys |
-| `scripts/player.gd` | Movement, targeting, casting, the caster model and its poses |
+| `scripts/player.gd` | Movement, targeting, casting, the sorcerer model, poses and hover cloud |
 | `scripts/camera_rig.gd` | WoW-style mouse camera and click targeting |
 | `scripts/force_lightning.gd` | The lightning effect |
 | `scripts/training_dummy.gd` | The dummy |
 | `scripts/hud.gd` | Player/target frames, cast bar, action bar |
-| `scripts/lowpoly.gd` | Helpers for flat-shaded low poly shapes |
+| `scripts/toon.gd` | Toon materials, outlines and smooth shape helpers |
+| `shaders/toon.gdshader` | Cel shading with tinted shadows, rim light and robe linings |
+| `shaders/outline.gdshader` | Ink outlines that keep the same width on screen |
 
 ## Play in the browser
 
